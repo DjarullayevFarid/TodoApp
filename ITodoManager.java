@@ -1,7 +1,6 @@
 package TodoApp;
 
 import java.time.LocalDate;
-
 import TodoApp.TodoItem.Status;
 
 public interface ITodoManager {
@@ -20,5 +19,9 @@ public interface ITodoManager {
     
     void deleteTodoItem(int no);
     
-    void GetAllTodoItemsByStatus(Status status);
+    void getAllTodoItemsByStatus(Status status);
+
+	void searchTodoItems(String string);
+	
+	void filterTodoItems(Status status, LocalDate fromDate, LocalDate toDate);
 }
