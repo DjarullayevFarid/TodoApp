@@ -24,4 +24,10 @@ public interface ITodoManager {
 	void searchTodoItems(String string);
 	
 	void filterTodoItems(Status status, LocalDate fromDate, LocalDate toDate);
+
+	TodoItem createTodoItem();
+
+	Status getStatusByChoice(int statusInput);
+
+	LocalDate deadlineCheck(String deadlineInput);
 }
