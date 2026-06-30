@@ -1,12 +1,20 @@
 package TodoApp;
 
+import java.sql.Connection;
+import java.sql.Date;
+import java.sql.PreparedStatement;
+import java.sql.SQLException;
+import java.sql.Timestamp;
+
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
+
 import java.util.ArrayList;
 import java.util.Scanner;
 
 import TodoApp.TodoItem.Status;
+
 import TodoApp.exceptions.InvalidStatusTransitionException;
 import TodoApp.exceptions.TaskNotFoundException;
 
@@ -42,7 +50,7 @@ public class TodoItemList {
 					System.out.println();
 					break;
 				case 2:
-					manager.getAllTodoItems();
+					manager.getAllTodoItemsFromDB();
 					break;
 				case 3:
 					manager.getAllDelayedTasks();
@@ -119,7 +127,7 @@ public class TodoItemList {
 						}
 					}
 					
-					manager.changeTodoItemStatus(no, status);
+					manager.changeTodoItemStatusInDB(no, status);
 					break;
 				}
 					
@@ -139,15 +147,21 @@ public class TodoItemList {
 					
 					LocalDate deadline = manager.deadlineCheck(deadlineInput);
 					
-					manager.editTodoItem(no, title, description, deadline);
+					manager.editTodoItemInDB(no, title, description, deadline);
 					break;
 				}
 				case 8:
 					System.out.println("Enter №: ");
 					int no = scan.nextInt();
-					manager.deleteTodoItem(no);
+					manager.deleteTodoItemFromDB(no);
 					break;
 			}
 		}
+		
+//		try (Connection connection = DatabaseConnection.getConnection()) {
+//		    System.out.println("Connected successfully!");
+//		} catch (Exception e) {
+//		    e.printStackTrace();
+//		}
 	}
 }

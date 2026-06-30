@@ -23,6 +23,17 @@ public class TodoItem {
 		
 	}
 	
+	public TodoItem(int no, Status status, String title,
+            String description, LocalDate deadline,
+            LocalDateTime statusChangedAt) {
+		this.no = no;
+		this.status = status;
+		this.title = title;
+		this.description = description;
+		this.deadline = deadline;
+		this.statusChangedAt = statusChangedAt;
+}
+	
 	public enum Status {
 	    TODO,
 	    DOING,

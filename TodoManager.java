@@ -1,15 +1,26 @@
 package TodoApp;
 
+import java.sql.Connection;
+import java.sql.Date;
+import java.sql.PreparedStatement;
+import java.sql.SQLException;
+import java.sql.Timestamp;
+import java.sql.ResultSet;
+import java.sql.Statement;
+
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
+
 import java.util.ArrayList;
 import java.util.Scanner;
+
 import TodoApp.TodoItem.Status;
+
 import TodoApp.exceptions.InvalidDeadlineException;
 import TodoApp.exceptions.InvalidStatusTransitionException;
 import TodoApp.exceptions.TaskNotFoundException;
-import java.time.format.DateTimeFormatter;
-import java.time.format.DateTimeParseException;
 
 public class TodoManager implements ITodoManager {
 	private ArrayList<TodoItem> todoItems;
@@ -26,6 +37,49 @@ public class TodoManager implements ITodoManager {
 		}
 			throw new TaskNotFoundException(
 				"Task №" + no + " not found");
+	}
+	
+	private TodoItem getTodoItemFromDBByNo(int no) {
+		String sql = """
+				SELECT * FROM todo_items
+				WHERE no = ?
+				""";
+		
+		try (
+				Connection connection = DatabaseConnection.getConnection();
+				PreparedStatement statement = connection.prepareStatement(sql);
+			) {
+			
+				statement.setInt(1, no);
+				
+				ResultSet resultSet = statement.executeQuery();
+
+				if (resultSet.next()) {
+					
+					Status status = 
+							Status.valueOf(resultSet.getString("status"));
+		            String title = resultSet.getString("title");
+		            String description = resultSet.getString("description");
+		            LocalDate deadline =
+		                    resultSet.getDate("deadline").toLocalDate();
+		            LocalDateTime statusChangedAt = 
+		            		resultSet.getTimestamp("status_changed_at")
+		                    .toLocalDateTime();
+		            
+		            return new TodoItem(
+		                    no,
+		                    status,
+		                    title,
+		                    description,
+		                    deadline,
+		                    statusChangedAt);
+		        }
+				
+		throw new TaskNotFoundException("Task №" + no + " not found");
+			
+		} catch (SQLException e) {
+			throw new RuntimeException(e);
+		}
 	}
 	
 	private void showTodoItem(int count, TodoItem todoItem) {
@@ -46,7 +100,7 @@ public class TodoManager implements ITodoManager {
 			deadline =
 					LocalDate.parse(deadlineInput, formatter);
 		} catch (DateTimeParseException ex) {
-			System.out.println("Invalid date format! Try again.");
+			throw new InvalidDeadlineException("Invalid date format.");
 		}
 		
 		if (!deadline.isAfter(LocalDate.now())) {
@@ -75,6 +129,34 @@ public class TodoManager implements ITodoManager {
 	
 	public void addTodoItem(TodoItem todoItem) {
 		todoItems.add(todoItem);
+		
+		String sql = """
+		        INSERT INTO todo_items
+		        (no, status, title, description, deadline, status_changed_at)
+		        VALUES (?, ?, ?, ?, ?, ?)
+		        """;
+
+		    try (
+		        Connection connection = DatabaseConnection.getConnection();
+		        PreparedStatement statement = connection.prepareStatement(sql)
+		    ) {
+
+		        statement.setInt(1, todoItem.getNo());
+		        statement.setString(2, todoItem.getStatus().name());
+		        statement.setString(3, todoItem.getTitle());
+		        statement.setString(4, todoItem.getDescription());
+		        statement.setDate(5, Date.valueOf(todoItem.getDeadline()));
+		        statement.setTimestamp(
+		                6,
+		                Timestamp.valueOf(todoItem.getStatusChangedAt()));
+
+		        statement.executeUpdate();
+
+		        System.out.println("Saved to database!");
+
+		    } catch (SQLException e) {
+		        e.printStackTrace();
+		    }
 	}
 	
 	public void getAllTodoItems() {
@@ -84,6 +166,39 @@ public class TodoManager implements ITodoManager {
 			count++;
 		}
 		System.out.println();
+	}
+	
+	public void getAllTodoItemsFromDB() {
+		String sql = "SELECT * FROM todo_items";
+
+	    try (
+	        Connection connection = DatabaseConnection.getConnection();
+	        Statement statement = connection.createStatement();
+	    ) {
+
+	        ResultSet resultSet = statement.executeQuery(sql);
+
+	        while (resultSet.next()) {
+
+	            int no = resultSet.getInt("no");
+	            String title = resultSet.getString("title");
+	            String description = resultSet.getString("description");
+	            String status = resultSet.getString("status");
+	            LocalDate deadline =
+	                    resultSet.getDate("deadline").toLocalDate();
+
+	            System.out.println(
+	                    no + " | "
+	                    + title + " | "
+	                    + description + " | "
+	                    + status + " | "
+	                    + deadline
+	            );
+	        }
+
+	    } catch (SQLException e) {
+	        e.printStackTrace();
+	    }
 	}
 	
 	public void getAllDelayedTasks() {
@@ -119,7 +234,7 @@ public class TodoManager implements ITodoManager {
 					&& status == Status.DOING) {
 					todoItem.setStatus(status);
 					todoItem.setStatusChangedAt();
-					System.out.println("№" + todoItem.getNo() 
+					System.out.println("№" + todoItem.getNo()
 					+ " task's status has been successfully changed to " 
 							+ status);
 				} else if (todoItem.getStatus() == Status.DOING 
@@ -131,6 +246,47 @@ public class TodoManager implements ITodoManager {
 							+ status);
 				}
 			}
+	
+	public void changeTodoItemStatusInDB(int no, Status status) {
+		TodoItem todo = getTodoItemFromDBByNo(no);
+		
+		String sql = """
+				UPDATE todo_items
+				SET status = ?, status_changed_at = ?
+				WHERE no = ?
+				""";
+		
+		try (
+				Connection connection = DatabaseConnection.getConnection();
+				PreparedStatement statement = connection.prepareStatement(sql);
+			) {
+			
+			if ((todo.getStatus() == Status.TODO 
+					&& status != Status.DOING) || 
+					(todo.getStatus() == Status.DOING 
+					&& status != Status.DONE))
+						throw new InvalidStatusTransitionException(
+							"Unable to change status from " 
+									+ todo.getStatus() 
+									+ " to " 
+									+ status 
+									+ ".");
+			
+			statement.setString(1, status.name());
+			statement.setTimestamp(2, Timestamp.valueOf(LocalDateTime.now()));
+			statement.setInt(3, no);
+			
+			int rows = statement.executeUpdate();
+			
+			if (rows == 0) {
+				throw new TaskNotFoundException(
+						"Task №" + no + " not found");
+			}
+			
+		} catch (SQLException e) {
+			throw new RuntimeException(e);
+		}
+	}
 	
 	public void editTodoItem(int no, String title, 
 			String description, LocalDate deadline) {
@@ -149,11 +305,85 @@ public class TodoManager implements ITodoManager {
 				}
 	}
 	
+	public void editTodoItemInDB(int no, String title, 
+			String description, LocalDate deadline) {
+		
+		TodoItem todo = getTodoItemFromDBByNo(no);
+		
+		String sql = """
+				UPDATE todo_items
+				SET title = ?, description = ?, deadline = ?
+				WHERE no = ?
+				""";
+		
+		try (
+				Connection connection = DatabaseConnection.getConnection();
+				PreparedStatement statement = connection.prepareStatement(sql);
+			) {
+			
+				if (title == null) {
+					title = todo.getTitle();
+				}
+				
+				if (description == null) {
+					description = todo.getDescription();
+				}
+				
+				if (deadline == null) {
+					deadline = todo.getDeadline();
+				}
+			
+				statement.setString(1, title);
+				statement.setString(2, description);
+				statement.setDate(3, Date.valueOf(deadline));
+				statement.setInt(4, no);
+				
+				int rows = statement.executeUpdate();
+				
+				if (rows == 0) {
+					throw new TaskNotFoundException(
+							"Task №" + no + " not found");
+				}
+				
+				System.out.println("The task has been edited.");
+
+			} catch (SQLException e) {
+				throw new RuntimeException(e);
+			}
+	}
+	
 	public void deleteTodoItem(int no) {
 		TodoItem todoItem = findByNo(no);
 				todoItems.remove(todoItem);
 				System.out.println("This task was removed.");
 			}
+	
+	public void deleteTodoItemFromDB(int no) {
+		String sql = """
+				DELETE FROM todo_items
+				WHERE no = ?
+				""";
+		
+		try (
+				Connection connection = DatabaseConnection.getConnection();
+				PreparedStatement statement = connection.prepareStatement(sql);
+			) {
+			
+				statement.setInt(1, no);
+				
+				int rows = statement.executeUpdate();
+				
+				if (rows == 0) {
+					throw new TaskNotFoundException(
+							"Task №" + no + " not found");
+				}
+
+		        System.out.println("Deleted from database!");
+				
+			} catch (SQLException e) {
+		        e.printStackTrace();
+		    }
+	}
 	
 	public void getAllTodoItemsByStatus(Status status) {
 		int count = 1;

@@ -30,4 +30,12 @@ public interface ITodoManager {
 	Status getStatusByChoice(int statusInput);
 
 	LocalDate deadlineCheck(String deadlineInput);
+
+	void getAllTodoItemsFromDB();
+
+	void changeTodoItemStatusInDB(int no, Status status);
+
+	void editTodoItemInDB(int no, String title, String description, LocalDate deadline);
+
+	void deleteTodoItemFromDB(int no);
 }
